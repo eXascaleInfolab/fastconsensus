@@ -301,11 +301,11 @@ def fast_consensus(G,  algorithm = 'louvain', n_p = 20, thresh = 0.2, delta = 0.
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some integers.')
 
-    parser.add_argument('-f', metavar='filename', type=str, nargs = '?', help='file with edgelist')
-    parser.add_argument('-np', metavar='n_p', type=int, nargs = '?', default=20, help='number of input partitions for the algorithm (Default value: 20)')
-    parser.add_argument('-t', metavar='tau', type=float, nargs = '?', help='used for filtering weak edges')
-    parser.add_argument('-d', metavar='del', type=float,  nargs = '?', default = 0.02, help='convergence parameter (default = 0.02). Converges when less than delta proportion of the edges are with wt = 1')
-    parser.add_argument('--alg', metavar='alg', type=str, nargs = '?', default = 'louvain' , help='choose from \'louvain\' , \'cnm\' , \'lpm\' , \'infomap\' ')
+    parser.add_argument('-f', '--network-file', metavar='filename', type=str, nargs = '?', help='file with edgelist')
+    parser.add_argument('-p', '--partitions', metavar='n_p', type=int, nargs = '?', default=20, help='number of input partitions for the algorithm (Default value: 20)')
+    parser.add_argument('-t', '--tau', metavar='tau', type=float, nargs = '?', help='used for filtering weak edges')
+    parser.add_argument('-d', '--delta', metavar='del', type=float,  nargs = '?', default = 0.02, help='convergence parameter (default = 0.02). Converges when less than delta proportion of the edges are with wt = 1')
+    parser.add_argument('-a', '--algorithm', metavar='alg', type=str, nargs = '?', default = 'louvain' , help='choose from \'louvain\' , \'cnm\' , \'lpm\' , \'infomap\' ')
 
     args = parser.parse_args()
 

@@ -78,6 +78,8 @@ def validate_arguments(args, algorithms):
         raise ValueError('Incorrect tau. run with -h for help')
     if args.procs < 1:
         raise ValueError('The number of worker processes shuould be positive')
+    if args.parts <=0 or args.outp_parts > args.parts:
+        raise ValueError('Invalid number of the output/input partitons is specified: {}/{}'.format(args.outp_parts, args.parts))
 
 
 def louvain_community_detection(networkx_graph):
@@ -284,13 +286,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Fast consensus clustering algorithm.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
+    nparts = 20
     parser.add_argument('-f', '--network-file', dest='inpfile', type=str, nargs='?', help='file with edgelist')
-    parser.add_argument('-p', '--partitions', dest='parts', type=int, nargs='?', default=20, help='number of input partitions for the algorithm')
+    parser.add_argument('-a', '--algorithm', dest='alg', type=str, nargs='?', default='louvain' , help='underlying clustering algorithm: {}'.format(', '.join(algorithms)))
+    parser.add_argument('-p', '--partitions', dest='parts', type=int, nargs='?', default=nparts, help='number of input partitions for the algorithm')
+    parser.add_argument('--outp-parts', dest='outp_parts', type=int, nargs='?', default=nparts, help='number of partitions to be outputted, <= input partitions')
     parser.add_argument('-t', '--tau', dest='tau', type=float, nargs='?', help='used for filtering weak edges')
     parser.add_argument('-d', '--delta', dest='delta', type=float,  nargs='?', default=0.02, help='convergence parameter. Converges when less than delta proportion of the edges are with wt = 1')
-    parser.add_argument('-a', '--algorithm', dest='alg', type=str, nargs='?', default='louvain' , help='underlying clustering algorithm: {}'.format(', '.join(algorithms)))
-    parser.add_argument('-o', '--output-dir', dest='outdir', type=str, nargs='?', default='out_partitions', help='output directory')
     parser.add_argument('-w', '--worker-procs', dest='procs', type=int, default=mp.cpu_count(), help='number of parallel worker processes for the clustering')
+    parser.add_argument('-o', '--output-dir', dest='outdir', type=str, nargs='?', default='out_partitions', help='output directory')
 
     args = parser.parse_args()
 
@@ -315,9 +319,10 @@ if __name__ == "__main__":
         args.outdir += '/'
     ofbase = args.outdir + os.path.splitext(os.path.split(args.inpfile)[1])[0]
 
-    oftpl = '{{}}_{{:0{}d}}.cnl'.format(int(math.ceil(math.log10(len(output)))))
-    i = 0
-    for partition in output:
+    oftpl = '{{}}_d{:.2}_{{:0{}d}}.cnl'.format(args.delta, int(math.ceil(math.log10(len(output)))))
+    for i, partition in enumerate(output):
+        if i >= args.outp_parts:
+            break
         with open(oftpl.format(ofbase, i), 'w') as f:
             for community in partition:
                 # Placeholder nodes of igraph form disconnected clusters, filter them out.
@@ -325,4 +330,3 @@ if __name__ == "__main__":
                 if placeholder_nds and len(community) == 1:
                     continue
                 print(*community, file=f)
-        i += 1

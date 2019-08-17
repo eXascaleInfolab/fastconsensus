@@ -290,7 +290,7 @@ if __name__ == "__main__":
     parser.add_argument('-f', '--network-file', dest='inpfile', type=str, nargs='?', help='file with edgelist')
     parser.add_argument('-a', '--algorithm', dest='alg', type=str, nargs='?', default='louvain' , help='underlying clustering algorithm: {}'.format(', '.join(algorithms)))
     parser.add_argument('-p', '--partitions', dest='parts', type=int, nargs='?', default=nparts, help='number of input partitions for the algorithm')
-    parser.add_argument('--outp-parts', dest='outp_parts', type=int, nargs='?', default=nparts, help='number of partitions to be outputted, <= input partitions')
+    parser.add_argument('--outp-parts', dest='outp_parts', type=int, nargs='?', default=None, help='number of partitions to be outputted, <= input partitions')
     parser.add_argument('-t', '--tau', dest='tau', type=float, nargs='?', help='used for filtering weak edges')
     parser.add_argument('-d', '--delta', dest='delta', type=float,  nargs='?', default=0.02, help='convergence parameter. Converges when less than delta proportion of the edges are with wt = 1')
     parser.add_argument('-w', '--worker-procs', dest='procs', type=int, default=mp.cpu_count(), help='number of parallel worker processes for the clustering')
@@ -299,8 +299,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     default_tau = {'louvain': 0.2, 'cnm': 0.7 ,'infomap': 0.6, 'lpm': 0.8}
-    if (args.tau == None):
+    if args.tau is None:
         args.tau = default_tau.get(args.alg, 0.2)
+    if args.outp_parts is None:
+       args.outp_parts = args.parts
+
     validate_arguments(args, algorithms)
 
     G = nx.read_edgelist(args.inpfile, nodetype=int, data=(('weight',float),))

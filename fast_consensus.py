@@ -311,7 +311,8 @@ if __name__ == "__main__":
         args.tau = default_tau.get(args.alg, 0.2)
     validate_arguments(args, algorithms)
 
-    G = nx.read_edgelist(args.inpfile, nodetype=int)  # , data=(('weight',float),)
+    # Note: id=0 vertex is mandatory in the input (igraph requirement) for the nodes of type 'int'
+    G = nx.read_edgelist(args.inpfile, data=(('weight',float),))  # , nodetype=int, data=(('weight',float),)
     output = fast_consensus(G, algorithm=args.alg, n_p=args.parts, thresh=args.tau, delta=args.delta, procs=args.procs)
 
     if not os.path.exists('out_partitions'):
@@ -330,7 +331,7 @@ if __name__ == "__main__":
     oftpl = '{{}}_{{:0{}d}}.cnl'.format(int(math.ceil(math.log10(len(output)))))
     i = 0
     for partition in output:
-        i += 1
         with open(oftpl.format(ofbase, i), 'w') as f:
             for community in partition:
                 print(*community, file=f)
+        i += 1

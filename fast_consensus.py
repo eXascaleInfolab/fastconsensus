@@ -9,7 +9,8 @@ import multiprocessing as mp
 import networkx as nx
 import numpy as np
 import igraph as ig
-from networkx.algorithms import community as cm
+import community as cm
+# from networkx.algorithms import community as cm
 
 
 def check_consensus_graph(G, n_p, delta):
@@ -37,10 +38,11 @@ def nx_to_igraph(Gnx):
     Function takes in a network Graph, Gnx and returns the equivalent
     igraph graph g
     '''
-    g = ig.Graph()
-    g.add_vertices(sorted(Gnx.nodes()))
-    g.add_edges(sorted(Gnx.edges()))
-    g.es["weight"] = 1.0
+    # g = ig.Graph(n=Gnx.number_of_nodes())
+    # # graph.vs["name"] = Gnx.nodes()
+    # g.add_edges(sorted(Gnx.edges()))
+    g = ig.Graph(sorted(Gnx.edges()))
+    g.es['weight'] = 1.0
     for edge in Gnx.edges():
         g[edge[0], edge[1]] = Gnx[edge[0]][edge[1]]['weight']
     return g
@@ -96,6 +98,12 @@ def get_yielded_graph(graph, times):
 
 
 def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, procs=mp.cpu_count()):
+    """Fast consensus algorithm
+
+    return communities  - resulting communities
+        placeholder_nds  - whether placeholder nodes are used by the igraph, which happens for
+            the non-contiguous node range or node ids not starting from 0
+    """
     graph = G.copy()
     L = G.number_of_edges()
     N = G.number_of_nodes()
@@ -114,7 +122,6 @@ def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, proc
                 communities_all = pool.map(louvain_community_detection, get_yielded_graph(graph, n_p))
 
             for node,nbr in graph.edges():
-
                 if (node,nbr) in graph.edges() or (nbr, node) in graph.edges():
                     if graph[node][nbr]['weight'] not in (0,n_p):
                         for i in range(n_p):
@@ -152,7 +159,7 @@ def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, proc
 
             for node in nx.isolates(nextgraph):
                     nbr, weight = sorted(graph[node].items(), key=lambda edge: edge[1]['weight'])[0]
-                    nextgraph.add_edge(node, nbr, weight = weight['weight'])
+                    nextgraph.add_edge(node, nbr, weight=weight['weight'])
 
             graph = nextgraph.copy()
 
@@ -161,7 +168,6 @@ def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, proc
 
         elif (algorithm in ('infomap', 'lpm')):
             nextgraph = graph.copy()
-
             for u,v in nextgraph.edges():
                 nextgraph[u][v]['weight'] = 0.0
 
@@ -205,7 +211,6 @@ def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, proc
 
         elif (algorithm == 'cnm'):
             nextgraph = graph.copy()
-
             for u,v in nextgraph.edges():
                 nextgraph[u][v]['weight'] = 0.0
 
@@ -262,16 +267,12 @@ def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, proc
         else:
             break
 
+    communities = None
+    placeholder_nds = False
     if (algorithm == 'louvain'):
         with mp.Pool(processes=procs) as pool:
-            communities_all = pool.map(louvain_community_detection, get_yielded_graph(graph, n_p))
-        return communities_all
-    if algorithm == 'infomap':
-        return [{frozenset(c) for c in nx_to_igraph(graph).community_infomap().as_cover()} for _ in range(n_p)]
-    if algorithm == 'lpm':
-        return [{frozenset(c) for c in nx_to_igraph(graph).community_label_propagation().as_cover()} for _ in range(n_p)]
-    if algorithm == 'cnm':
-
+            communities = pool.map(louvain_community_detection, get_yielded_graph(graph, n_p))
+    elif algorithm == 'cnm':
         communities = []
         mapping = []
         inv_map = []
@@ -282,12 +283,22 @@ def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, proc
 
             mapping.append(maps)
             inv_map.append({v: k for k, v in maps.items()})
-            G_c = nx.relabel_nodes(graph, mapping = maps, copy = True)
+            G_c = nx.relabel_nodes(graph, mapping=maps, copy=True)
             G_igraph = nx_to_igraph(G_c)
+            if len(G_igraph.vs) != graph.number_of_nodes():
+                placeholder_nds = True
 
             communities.append(G_igraph.community_fastgreedy(weights = 'weight').as_clustering())
+    else:
+        ig_graph = nx_to_igraph(graph)
+        if len(ig_graph.vs) != graph.number_of_nodes():
+            placeholder_nds = True
+        if algorithm == 'infomap':
+            communities = [{frozenset(c) for c in ig_graph.community_infomap().as_cover()} for _ in range(n_p)]
+        if algorithm == 'lpm':
+            communities = [{frozenset(c) for c in ig_graph.community_label_propagation().as_cover()} for _ in range(n_p)]
 
-        return communities
+    return communities, placeholder_nds
 
 
 if __name__ == "__main__":
@@ -311,9 +322,8 @@ if __name__ == "__main__":
         args.tau = default_tau.get(args.alg, 0.2)
     validate_arguments(args, algorithms)
 
-    # Note: id=0 vertex is mandatory in the input (igraph requirement) for the nodes of type 'int'
-    G = nx.read_edgelist(args.inpfile, data=(('weight',float),))  # , nodetype=int, data=(('weight',float),)
-    output = fast_consensus(G, algorithm=args.alg, n_p=args.parts, thresh=args.tau, delta=args.delta, procs=args.procs)
+    G = nx.read_edgelist(args.inpfile, nodetype=int, data=(('weight',float),))
+    output, placeholder_nds = fast_consensus(G, algorithm=args.alg, n_p=args.parts, thresh=args.tau, delta=args.delta, procs=args.procs)
 
     if not os.path.exists('out_partitions'):
         os.makedirs('out_partitions')
@@ -333,5 +343,9 @@ if __name__ == "__main__":
     for partition in output:
         with open(oftpl.format(ofbase, i), 'w') as f:
             for community in partition:
+                # Placeholder nodes of igraph form disconnected clusters, filter them out.
+                # Typically it happens when node ids in the edges file start from 1+ instead of 0
+                if placeholder_nds and len(community) == 1:
+                    continue
                 print(*community, file=f)
         i += 1

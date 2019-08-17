@@ -8,6 +8,9 @@ If you use the script please cite this paper.
 
 The procedure generates *median* or *consensus* partitions from multiple runs of a community detection algorithm. Tests on artificial benchmarks show that consensus partitions are more accurate than the ones obtained by the direct application of the clustering algorithm.
 
+This is the refactored version of the Fast Consensus. The I/O formats are extended to be natively applicable for the [PyCaBeM](https://github.com/eXascaleInfolab/PyCABeM) clustering benchmark: arbitrary ranges of ids are supported in the input edgefile, output directory and the number of worker processes are parameterized.  
+Extended by Artem Lutov <artem@exascale.info>
+
 ## Requirements
 
 The script requires the following:
@@ -26,13 +29,39 @@ $ pip install -r requirements.txt
 
 ## Usage
 
-You can run the script with
 
 ```
-$ python fast_consensus.py -f path_to_file/edgelist.txt [-a algorithm] [-p n_p] [-t tau] [-d delta]
-```
+$ python3 fast_consensus.py [-h] -f INPFILE [-a ALG] [-p PARTS]
+                         [--outp-parts OUTP_PARTS] [-t TAU] [-d DELTA]
+                         [-w PROCS] [-o OUTDIR]
 
-with the following options -
+Fast consensus clustering algorithm.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -f INPFILE, --network-file INPFILE
+                        file with edgelist (default: None)
+  -a ALG, --algorithm ALG
+                        underlying clustering algorithm: louvain, lpm, cnm,
+                        infomap. Note: CNM is slow (default: louvain)
+  -p PARTS, --partitions PARTS
+                        number of input partitions for the algorithm (default:
+                        20)
+  --outp-parts OUTP_PARTS
+                        number of partitions to be outputted, <= input
+                        partitions (default: 1)
+  -t TAU, --tau TAU     used for filtering weak edges (default: None)
+  -d DELTA, --delta DELTA
+                        convergence parameter. Converges when less than delta
+                        proportion of the edges are with wt = 1 (default:
+                        0.02)
+  -w PROCS, --worker-procs PROCS
+                        number of parallel worker processes for the clustering
+                        (default: 4)
+  -o OUTDIR, --output-dir OUTDIR
+                        output directory (default: out_partitions)
+```
+Arguments description:
 ```
 -f filename.txt
 ```
@@ -57,9 +86,9 @@ where the first two numbers in each row are connected nodes and the third number
 (Optional) Here `algorithm` is the community detection method used on the network and it can be one of `louvain` ([Louvain algorithm](https://arxiv.org/abs/0803.0476)), `cnm` ([Fast greedy modularity maximization](https://arxiv.org/abs/cond-mat/0408187)), `lpm` ([Label Propagation Method](https://arxiv.org/abs/0709.2938)), `infomap` ([Infomap](http://www.mapequation.org/code.html)). If no algorithm is provided the script uses `louvain` for this purpose.
 
 ```
--p n_p
+-p partitions
 ```
-(Optional) `n_p` is the number of partitions created by repeated application of the community detection algorithm. If no value is provided, `n_p = 20`
+(Optional) `p` is the number of partitions created by repeated application of the community detection algorithm. If no value is provided, `p = 20`
 
 ```
 -t tau
@@ -90,3 +119,10 @@ For example, a run with `n_p = 2` will create two files `1` and `2`. Each file w
 3 4 6 10 11
 ```
 This represents a partition with two communities : `{0, 1, 2, 5, 7, 8, 9}` and `{3, 4, 6, 10, 11}`
+
+## Related Projects
+- [xmeasures](https://github.com/eXascaleInfolab/xmeasures)  - Extrinsic quality (accuracy) measures evaluation for the overlapping clustering on large datasets: family of mean F1-Score (including clusters labeling), Omega Index (fuzzy version of the Adjusted Rand Index) and standard NMI (for non-overlapping clusters).
+- [GenConvNMI](https://github.com/eXascaleInfolab/GenConvNMI) - Overlapping NMI evaluation that is compatible with the original NMI (unlike the `onmi`).
+- [OvpNMI](https://github.com/eXascaleInfolab/OvpNMI) - Another method of the NMI evaluation for the overlapping clusters (communities) that is not compatible with the standard NMI value unlike GenConvNMI, but it is much faster and yields exact results unlike probabilistic results with some variance in GenConvNMI.
+- [Clubmark](https://github.com/eXascaleInfolab/clubmark) - A parallel isolation framework for benchmarking and profiling clustering (community detection) algorithms considering overlaps (covers).
+- [ExecTime](https://bitbucket.org/lumais/exectime/)  - A lightweight resource consumption (RSS RAM, CPU, etc.) profiler.

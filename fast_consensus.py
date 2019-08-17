@@ -1,20 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import print_function  # Required for stderr output, must be the first import
-import networkx as nx
-import numpy as np
-import itertools
-import sys
 import os
 import random
-import igraph as ig
-from networkx.algorithms import community
-import networkx.algorithms.isolate
-import community as cm
 import math
-import random
 import argparse
 import multiprocessing as mp
+import networkx as nx
+import numpy as np
+import igraph as ig
+from networkx.algorithms import community as cm
 
 
 def check_consensus_graph(G, n_p, delta):
@@ -69,21 +64,18 @@ def group_to_partition(partition):
     return part_dict.values()
 
 
-def check_arguments(args):
-    if(args.d > 0.2):
-        print('delta is too high. Allowed values are between 0.02 and 0.2')
-        return False
-    if(args.d < 0.02):
-        print('delta is too low. Allowed values are between 0.02 and 0.2')
-        return False
-    if(args.alg not in ('louvain', 'lpm', 'cnm', 'infomap')):
-        print('Incorrect algorithm entered. run with -h for help')
-        return False
-    if (args.t > 1 or args.t < 0):
-        print('Incorrect tau. run with -h for help')
-        return False
+def validate_arguments(args, algorithms):
+    if args.delta < 0.02:
+        raise ValueError('delta is too low. Allowed values are between 0.02 and 0.2')
+    if args.delta > 0.2:
+        raise ValueError('delta is too high. Allowed values are between 0.02 and 0.2')
 
-    return True
+    if args.alg not in algorithms:
+        raise ValueError('Incorrect algorithm entered. run with -h for help')
+    if args.tau < 0 or args.tau > 1:
+        raise ValueError('Incorrect tau. run with -h for help')
+    if args.procs < 1:
+        raise ValueError('The number of worker processes shuould be positive')
 
 
 def louvain_community_detection(networkx_graph):
@@ -103,7 +95,7 @@ def get_yielded_graph(graph, times):
         yield graph
 
 
-def fast_consensus(G,  algorithm = 'louvain', n_p = 20, thresh = 0.2, delta = 0.02):
+def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, procs=mp.cpu_count()):
     graph = G.copy()
     L = G.number_of_edges()
     N = G.number_of_nodes()
@@ -118,7 +110,7 @@ def fast_consensus(G,  algorithm = 'louvain', n_p = 20, thresh = 0.2, delta = 0.
             for u,v in nextgraph.edges():
                 nextgraph[u][v]['weight'] = 0.0
 
-            with mp.Pool(processes=mp.cpu_count()) as pool:
+            with mp.Pool(processes=procs) as pool:
                 communities_all = pool.map(louvain_community_detection, get_yielded_graph(graph, n_p))
 
             for node,nbr in graph.edges():
@@ -139,7 +131,7 @@ def fast_consensus(G,  algorithm = 'louvain', n_p = 20, thresh = 0.2, delta = 0.
             nextgraph.remove_edges_from(remove_edges)
 
 
-            if check_consensus_graph(nextgraph, n_p = n_p, delta = delta):
+            if check_consensus_graph(nextgraph, n_p=n_p, delta=delta):
                 break
 
             for _ in range(L):
@@ -164,7 +156,7 @@ def fast_consensus(G,  algorithm = 'louvain', n_p = 20, thresh = 0.2, delta = 0.
 
             graph = nextgraph.copy()
 
-            if check_consensus_graph(nextgraph, n_p = n_p, delta = delta):
+            if check_consensus_graph(nextgraph, n_p=n_p, delta=delta):
                 break
 
         elif (algorithm in ('infomap', 'lpm')):
@@ -208,7 +200,7 @@ def fast_consensus(G,  algorithm = 'louvain', n_p = 20, thresh = 0.2, delta = 0.
                                 nextgraph[a][b]['weight'] += 1
 
             graph = nextgraph.copy()
-            if check_consensus_graph(nextgraph, n_p = n_p, delta = delta):
+            if check_consensus_graph(nextgraph, n_p=n_p, delta=delta):
                 break
 
         elif (algorithm == 'cnm'):
@@ -271,7 +263,7 @@ def fast_consensus(G,  algorithm = 'louvain', n_p = 20, thresh = 0.2, delta = 0.
             break
 
     if (algorithm == 'louvain'):
-        with mp.Pool(processes=mp.cpu_count()) as pool:
+        with mp.Pool(processes=procs) as pool:
             communities_all = pool.map(louvain_community_detection, get_yielded_graph(graph, n_p))
         return communities_all
     if algorithm == 'infomap':
@@ -299,25 +291,28 @@ def fast_consensus(G,  algorithm = 'louvain', n_p = 20, thresh = 0.2, delta = 0.
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Process some integers.')
+    algorithms = ('louvain', 'lpm', 'cnm', 'infomap')  # Clustering algorithms
 
-    parser.add_argument('-f', '--network-file', metavar='filename', type=str, nargs = '?', help='file with edgelist')
-    parser.add_argument('-p', '--partitions', metavar='n_p', type=int, nargs = '?', default=20, help='number of input partitions for the algorithm (Default value: 20)')
-    parser.add_argument('-t', '--tau', metavar='tau', type=float, nargs = '?', help='used for filtering weak edges')
-    parser.add_argument('-d', '--delta', metavar='del', type=float,  nargs = '?', default = 0.02, help='convergence parameter (default = 0.02). Converges when less than delta proportion of the edges are with wt = 1')
-    parser.add_argument('-a', '--algorithm', metavar='alg', type=str, nargs = '?', default = 'louvain' , help='choose from \'louvain\' , \'cnm\' , \'lpm\' , \'infomap\' ')
+    parser = argparse.ArgumentParser(description='Fast consensus clustering algorithm.',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument('-f', '--network-file', dest='inpfile', type=str, nargs='?', help='file with edgelist')
+    parser.add_argument('-p', '--partitions', dest='parts', type=int, nargs='?', default=20, help='number of input partitions for the algorithm')
+    parser.add_argument('-t', '--tau', dest='tau', type=float, nargs='?', help='used for filtering weak edges')
+    parser.add_argument('-d', '--delta', dest='delta', type=float,  nargs='?', default=0.02, help='convergence parameter. Converges when less than delta proportion of the edges are with wt = 1')
+    parser.add_argument('-a', '--algorithm', dest='alg', type=str, nargs='?', default='louvain' , help='underlying clustering algorithm: {}'.format(', '.join(algorithms)))
+    parser.add_argument('-o', '--output-dir', dest='outdir', type=str, nargs='?', default='out_partitions', help='output directory')
+    parser.add_argument('-w', '--worker-procs', dest='procs', type=int, default=mp.cpu_count(), help='number of parallel worker processes for the clustering')
 
     args = parser.parse_args()
 
     default_tau = {'louvain': 0.2, 'cnm': 0.7 ,'infomap': 0.6, 'lpm': 0.8}
-    if (args.t == None):
-        args.t = default_tau.get(args.alg, 0.2)
+    if (args.tau == None):
+        args.tau = default_tau.get(args.alg, 0.2)
+    validate_arguments(args, algorithms)
 
-    if check_arguments(args) == False:
-        quit()
-
-    G = nx.read_edgelist(args.f, nodetype=int)
-    output = fast_consensus(G, algorithm = args.alg, n_p = args.np, thresh = args.t, delta = args.d)
+    G = nx.read_edgelist(args.inpfile, nodetype=int)  # , data=(('weight',float),)
+    output = fast_consensus(G, algorithm=args.alg, n_p=args.parts, thresh=args.tau, delta=args.delta, procs=args.procs)
 
     if not os.path.exists('out_partitions'):
         os.makedirs('out_partitions')
@@ -326,9 +321,16 @@ if __name__ == "__main__":
         for i in range(len(output)):
             output[i] = group_to_partition(output[i])
 
+    if not os.path.exists(args.outdir):
+        os.makedirs(args.outdir)
+    if not args.outdir.endswith('/'):
+        args.outdir += '/'
+    ofbase = args.outdir + os.path.splitext(os.path.split(args.inpfile)[1])[0]
+
+    oftpl = '{{}}_{{:0{}d}}.cnl'.format(int(math.ceil(math.log10(len(output)))))
     i = 0
     for partition in output:
         i += 1
-        with open('out_partitions/' + str(i) , 'w') as f:
+        with open(oftpl.format(ofbase, i), 'w') as f:
             for community in partition:
                 print(*community, file=f)

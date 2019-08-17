@@ -1,6 +1,6 @@
 # Fast Consensus Clustering in Networks
 
-Fast consensus is an implementation of the fast consensus clustering procedure laid out in -
+Fast consensus is an implementation of the fast consensus clustering procedure laid out in:
 
 * Aditya Tandon, Aiiad Albeshri, Vijey Thayananthan, Wadee Alhalabi and Santo Fortunato: “[Fast consensus clustering in complex networks](https://arxiv.org/pdf/1902.04014.pdf)”, **Phys. Rev. E.**; 2019
 
@@ -104,16 +104,16 @@ where the first two numbers in each row are connected nodes and the third number
 #### Example Usage
 
 ```
-$ python fast_consensus.py -f examples/karate_club.txt -a louvain -p 50 -t 0.2 -d 0.1
+$ python fast_consensus.py -f examples/karate_club.txt -o res_louv -a louvain -p 50 -t 0.2 -d 0.1
 ```
 
 The file `examples/karate_club.txt` is provided.
 
 
 ## Output
-A folder `out_partitions` is created with `n_p` different files. Each file represents a partition; each line in the file lists all nodes belonging to a community.
+A folder `res_louv` is created with `--outp-parts` different files. Each file represents a partition; each line in the file lists all nodes belonging to a community.
 
-For example, a run with `n_p = 2` will create two files `1` and `2`. Each file will be in the form:
+For example, a run with `--outp-parts = 2` will create two files `karate_club_d0.1_1.cnl` and `karate_club_d0.1_1.cnl`. Each file will be in the form:
 ```
 0 1 2 5 7 8 9
 3 4 6 10 11

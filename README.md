@@ -8,7 +8,7 @@ If you use the script please cite this paper.
 
 The procedure generates *median* or *consensus* partitions from multiple runs of a community detection algorithm. Tests on artificial benchmarks show that consensus partitions are more accurate than the ones obtained by the direct application of the clustering algorithm.
 
-This is the refactored version of the Fast Consensus. The I/O formats are extended to be natively applicable for the [PyCaBeM](https://github.com/eXascaleInfolab/PyCABeM) clustering benchmark: arbitrary ranges of ids are supported in the input edgefile, output directory and the number of worker processes are parameterized.  
+This is the refactored version of the Fast Consensus. The I/O formats are extended to be natively applicable for the [PyCaBeM](https://github.com/eXascaleInfolab/PyCABeM) clustering benchmark: arbitrary ranges of ids are supported in the input edgefile, weighted networks are supported, output directory and the number of worker processes are parameterized.  
 Extended by Artem Lutov <artem@exascale.info>
 
 ## Requirements

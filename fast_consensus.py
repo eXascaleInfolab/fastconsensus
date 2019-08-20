@@ -32,7 +32,7 @@ def check_consensus_graph(G, n_p, delta):
     return True
 
 
-def nx_to_igraph(Gnx):
+def nx_to_igraph(Gnx, G):
     '''
     Function takes in a network Graph, Gnx and returns the equivalent
     igraph graph g
@@ -42,8 +42,8 @@ def nx_to_igraph(Gnx):
     # g.add_edges(sorted(Gnx.edges()))
     g = ig.Graph(sorted(Gnx.edges()))
     g.es['weight'] = 1.0
-    for edge in Gnx.edges():
-        g[edge[0], edge[1]] = Gnx[edge[0]][edge[1]]['weight']
+    for es, ed in Gnx.edges():
+        g[es, ed] = G[es][ed]['weight']
     return g
 
 
@@ -102,12 +102,12 @@ def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, proc
         placeholder_nds  - whether placeholder nodes are used by the igraph, which happens for
             the non-contiguous node range or node ids not starting from 0
     """
+    for u,v in G.edges():
+        G[u][v].setdefault('weight', 1.0)  # Set weights if have not been initialized
     graph = G.copy()
     L = G.number_of_edges()
     N = G.number_of_nodes()
 
-    for u,v in graph.edges():
-        graph[u][v]['weight'] = 1.0
 
     while(True):
         if (algorithm == 'louvain'):
@@ -160,9 +160,9 @@ def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, proc
                 nextgraph[u][v]['weight'] = 0.0
 
             if algorithm == 'infomap':
-                communities = [{frozenset(c) for c in nx_to_igraph(graph).community_infomap().as_cover()} for _ in range(n_p)]
+                communities = [{frozenset(c) for c in nx_to_igraph(graph, G).community_infomap().as_cover()} for _ in range(n_p)]
             if algorithm == 'lpm':
-                communities = [{frozenset(c) for c in nx_to_igraph(graph).community_label_propagation().as_cover()} for _ in range(n_p)]
+                communities = [{frozenset(c) for c in nx_to_igraph(graph, G).community_label_propagation().as_cover()} for _ in range(n_p)]
 
             for node, nbr in graph.edges():
                 for i in range(n_p):
@@ -208,7 +208,7 @@ def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, proc
                 mapping.append(maps)
                 inv_map.append({v: k for k, v in maps.items()})
                 G_c = nx.relabel_nodes(graph, mapping = maps, copy = True)
-                G_igraph = nx_to_igraph(G_c)
+                G_igraph = nx_to_igraph(G_c, G)
 
                 communities.append(G_igraph.community_fastgreedy(weights = 'weight').as_clustering())
             for i in range(n_p):
@@ -260,12 +260,12 @@ def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, proc
             mapping.append(maps)
             inv_map.append({v: k for k, v in maps.items()})
             G_c = nx.relabel_nodes(graph, mapping=maps, copy=True)
-            G_igraph = nx_to_igraph(G_c)
+            G_igraph = nx_to_igraph(G_c, G)
             if len(G_igraph.vs) != graph.number_of_nodes():
                 placeholder_nds = True
             communities.append(G_igraph.community_fastgreedy(weights = 'weight').as_clustering())
     else:
-        ig_graph = nx_to_igraph(graph)
+        ig_graph = nx_to_igraph(graph, G)
         if len(ig_graph.vs) != graph.number_of_nodes():
             placeholder_nds = True
         if algorithm == 'infomap':

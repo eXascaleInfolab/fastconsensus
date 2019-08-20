@@ -288,7 +288,7 @@ if __name__ == "__main__":
     parser.add_argument('--outp-parts', dest='outp_parts', type=int, default=1, help='number of partitions to be outputted, <= input partitions')
     parser.add_argument('-t', '--tau', dest='tau', type=float, help='used for filtering weak edges')
     parser.add_argument('-d', '--delta', dest='delta', type=float, default=0.02, help='convergence parameter. Converges when less than delta proportion of the edges are with wt = 1')
-    parser.add_argument('-w', '--worker-procs', dest='procs', type=int, default=mp.cpu_count(), help='number of parallel worker processes for the clustering')
+    parser.add_argument('-w', '--worker-procs', dest='procs', type=int, default=None, help='number of parallel worker processes for the clustering, <= input partitions')
     parser.add_argument('-o', '--output-dir', dest='outdir', type=str, default='out_partitions', help='output directory')
 
     args = parser.parse_args()
@@ -298,6 +298,11 @@ if __name__ == "__main__":
         args.tau = default_tau.get(args.alg, 0.2)
     if args.outp_parts is None:
        args.outp_parts = args.parts
+
+    if args.procs is None:
+        args.procs = mp.cpu_count()
+    if args.procs > args.parts:
+        args.procs = args.parts
 
     validate_arguments(args, algorithms)
 

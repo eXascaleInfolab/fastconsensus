@@ -46,7 +46,7 @@ optional arguments:
                         infomap. Note: CNM is slow (default: louvain)
   -p PARTS, --partitions PARTS
                         number of input partitions for the algorithm (default:
-                        20)
+                        10)
   --outp-parts OUTP_PARTS
                         number of partitions to be outputted, <= input
                         partitions (default: 1)
@@ -56,8 +56,9 @@ optional arguments:
                         proportion of the edges are with wt = 1 (default:
                         0.02)
   -w PROCS, --worker-procs PROCS
-                        number of parallel worker processes for the clustering
-                        (default: 4)
+                        number of parallel worker processes for the
+                        clustering, it is automatically decreased to
+                        min(input_partitions, cpu_num) (default: 10)
   -o OUTDIR, --output-dir OUTDIR
                         output directory (default: out_partitions)
 ```
@@ -79,16 +80,21 @@ The file can be of the form
 
 where the first two numbers in each row are connected nodes and the third number is the edge weight. If only two numbers are provided the graph is treated as unweighted.
 
-
 ```
 -a algorithm
 ```
-(Optional) Here `algorithm` is the community detection method used on the network and it can be one of `louvain` ([Louvain algorithm](https://arxiv.org/abs/0803.0476)), `cnm` ([Fast greedy modularity maximization](https://arxiv.org/abs/cond-mat/0408187)), `lpm` ([Label Propagation Method](https://arxiv.org/abs/0709.2938)), `infomap` ([Infomap](http://www.mapequation.org/code.html)). If no algorithm is provided the script uses `louvain` for this purpose.
+(Optional) Here `algorithm` is the community detection method used on the network and it can be one of `louvain` ([Louvain algorithm](https://arxiv.org/abs/0803.0476)), `cnm` ([Fast greedy modularity maximization](https://arxiv.org/abs/cond-mat/0408187)), `lpm` ([Label Propagation Method](https://arxiv.org/abs/0709.2938)), `infomap` ([Infomap](http://www.mapequation.org/code.html)). If no algorithm is provided the script uses `louvain` for this purpose as the most scalable option.
 
 ```
 -p partitions
 ```
-(Optional) `p` is the number of partitions created by repeated application of the community detection algorithm. If no value is provided, `p = 20`
+(Optional) `p` is the number of partitions created by repeated application of the community detection algorithm. The larger this value, the more robust results are. The computational time is increased linearly with `p`.
+> The number of worker process is recommended to be set to the number of input partitions.
+
+```
+--outp-parts output_partitions
+```
+Optional number of the output partitions (up to the number of input partitions). Note that all the partitions have absolutely equivalent clusters in case of the perfect consensus, and differ only marginally otherwise.
 
 ```
 -t tau
@@ -98,7 +104,7 @@ where the first two numbers in each row are connected nodes and the third number
 ```
 -d delta
 ```
-(Optional) `delta` should be a float between `0.02` and `0.1`. The procedure ends when less than `delta` fraction of the edges have a weight not equal to 1. If no value is provided, `delta` is set to `0.02`
+(Optional) `delta` should be a float between `0.02` and `0.1`. The procedure ends when less than `delta` fraction of the edges have a weight not equal to 1. The lower delta, the more time is required for the algorithm convergence given a fixed `tau`.
 
 
 #### Example Usage
@@ -113,7 +119,7 @@ The file `examples/karate_club.txt` is provided.
 ## Output
 A folder `res_louv` is created with `--outp-parts` different files. Each file represents a partition; each line in the file lists all nodes belonging to a community.
 
-For example, a run with `--outp-parts = 2` will create two files `karate_club_d0.1_1.cnl` and `karate_club_d0.1_1.cnl`. Each file will be in the form:
+For example, a run with `--outp-parts = 2` will create two files `karate_club_d0.1_0.cnl` and `karate_club_d0.1_1.cnl`. Each file will be in the form:
 ```
 0 1 2 5 7 8 9
 3 4 6 10 11

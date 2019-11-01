@@ -101,8 +101,6 @@ def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, proc
     """Fast consensus algorithm
 
     return communities  - resulting communities
-        placeholder_nds  - whether placeholder nodes are used by the igraph, which happens for
-            the non-contiguous node range or node ids not starting from 0
     """
     for u,v in G.edges():
         G[u][v].setdefault('weight', 1.0)  # Set weights if have not been initialized
@@ -246,7 +244,6 @@ def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, proc
             break
 
     communities = None
-    placeholder_nds = False
     if (algorithm == 'louvain'):
         with mp.Pool(processes=procs) as pool:
             communities = pool.map(louvain_community_detection, get_yielded_graph(graph, n_p))
@@ -263,19 +260,15 @@ def fast_consensus(G,  algorithm='louvain', n_p=20, thresh=0.2, delta=0.02, proc
             inv_map.append({v: k for k, v in maps.items()})
             G_c = nx.relabel_nodes(graph, mapping=maps, copy=True)
             G_igraph = nx_to_igraph(G_c, G)
-            if len(G_igraph.vs) != graph.number_of_nodes():
-                placeholder_nds = True
             communities.append(G_igraph.community_fastgreedy(weights = 'weight').as_clustering())
     else:
         ig_graph = nx_to_igraph(graph, G)
-        if len(ig_graph.vs) != graph.number_of_nodes():
-            placeholder_nds = True
         if algorithm == 'infomap':
             communities = [{frozenset(c) for c in ig_graph.community_infomap().as_cover()} for _ in range(n_p)]
         if algorithm == 'lpm':
             communities = [{frozenset(c) for c in ig_graph.community_label_propagation().as_cover()} for _ in range(n_p)]
 
-    return communities, placeholder_nds
+    return communities
 
 
 if __name__ == "__main__":
@@ -311,7 +304,8 @@ if __name__ == "__main__":
     validate_arguments(args, algorithms)
 
     G = nx.read_edgelist(args.inpfile, nodetype=int, data=(('weight',float),))
-    output, placeholder_nds = fast_consensus(G, algorithm=args.alg, n_p=args.parts, thresh=args.tau, delta=args.delta, procs=args.procs)
+    G = nx.convert_node_labels_to_integers(G, label_attribute = 'name')
+    output = fast_consensus(G, algorithm=args.alg, n_p=args.parts, thresh=args.tau, delta=args.delta, procs=args.procs)
 
     if(args.alg == 'louvain'):
         for i in range(len(output)):
@@ -329,8 +323,4 @@ if __name__ == "__main__":
             break
         with open(oftpl.format(ofbase, i), 'w') as f:
             for community in partition:
-                # Placeholder nodes of igraph form disconnected clusters, filter them out.
-                # Typically it happens when node ids in the edges file start from 1+ instead of 0
-                if placeholder_nds and len(community) == 1:
-                    continue
-                print(*community, file=f)
+                print(' '.join(str(G.node[nd]['name']) for nd in community), file=f)
